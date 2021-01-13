@@ -4,7 +4,6 @@ import (
 	"github.com/anthonyhawkins/savorbook/middleware"
 	"github.com/anthonyhawkins/savorbook/users"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func SetupRoutes(app *fiber.App) {
@@ -14,12 +13,13 @@ func SetupRoutes(app *fiber.App) {
 		return c.SendString("Hello, World 👋!")
 	})
 
-	api := app.Group("/api", logger.New())
+	api := app.Group("/api")
 
 	//Auth
 	auth := api.Group("/auth")
 	auth.Post("/register", users.CreateUser)
 	auth.Post("/login", users.LogInUser)
+	auth.Get("/account", middleware.Protected(), users.GetAccount)
 
 	// User
 	//publish := api.Group("/publish")

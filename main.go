@@ -5,6 +5,8 @@ import (
 	"github.com/anthonyhawkins/savorbook/router"
 	"github.com/anthonyhawkins/savorbook/users"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 	"gorm.io/gorm"
 )
 
@@ -21,6 +23,8 @@ func main() {
 	defer sqlDB.Close()
 
 	app := fiber.New()
+	app.Use(logger.New())
+	app.Use(cors.New())
 	router.SetupRoutes(app)
 	app.Listen(":3000")
 }

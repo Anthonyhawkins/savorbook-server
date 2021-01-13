@@ -1,11 +1,15 @@
 package users
 
 import (
+	"errors"
+	"fmt"
 	"github.com/anthonyhawkins/savorbook/database"
 	"github.com/anthonyhawkins/savorbook/middleware"
 	"github.com/anthonyhawkins/savorbook/responses"
+	"github.com/form3tech-oss/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func setPassword(password string) string {
@@ -40,7 +44,8 @@ func CreateUser(c *fiber.Ctx) error {
 
 	errors := ValidateRegistration(*registration)
 	if errors != nil {
-		return c.JSON(errors)
+		response.Errors = errors
+		return c.JSON(response)
 	}
 
 	//Check to see if username and email is already in use.
@@ -71,7 +76,7 @@ func CreateUser(c *fiber.Ctx) error {
 	db.Create(&user)
 
 	//generate JWT Token
-	signedToken, err := middleware.SetToken(user.Username, user.Email, user.ID)
+	signedToken, err := middleware.SetToken(user.Username, user.DisplayName, user.Email, user.ID)
 	if err != nil {
 		response.Message = "Login Error"
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
@@ -83,10 +88,12 @@ func CreateUser(c *fiber.Ctx) error {
 	response.Data = struct {
 		AccessToken string `json:"accessToken"`
 		UserId      uint   `json:"userId"`
+		Username    string `json:"username"`
 		DisplayName string `json:"displayName"`
 	}{
 		AccessToken: signedToken,
 		UserId:      user.ID,
+		Username:    user.Username,
 		DisplayName: user.DisplayName,
 	}
 
@@ -109,7 +116,7 @@ func LogInUser(c *fiber.Ctx) error {
 
 	// Retrieve Existing User and ensure password matches
 	db := database.GetDB()
-	query := map[string]interface{}{"username": login.Username}
+	query := map[string]interface{}{"email": login.Email}
 	var user = new(User)
 	db.Where(query).Find(&user)
 
@@ -120,7 +127,7 @@ func LogInUser(c *fiber.Ctx) error {
 	}
 
 	//generate JWT Token and return with user data
-	signedToken, err := middleware.SetToken(user.Username, user.Email, user.ID)
+	signedToken, err := middleware.SetToken(user.Username, user.DisplayName, user.Email, user.ID)
 	if err != nil {
 		response.Message = "Login Error"
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
@@ -139,6 +146,36 @@ func LogInUser(c *fiber.Ctx) error {
 		DisplayName: user.DisplayName,
 	}
 
+	return c.JSON(response)
+
+}
+
+func GetAccount(c *fiber.Ctx) error {
+
+	response := new(responses.StandardResponse)
+	response.Success = false
+
+	userToken := c.Locals("user").(*jwt.Token)
+	claims := userToken.Claims.(jwt.MapClaims)
+	userId := claims["sub"]
+
+	// Retrieve Existing User and ensure password matches
+	db := database.GetDB()
+
+	var user = new(User)
+	result := db.First(&user, userId)
+
+	fmt.Println(user.Username)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		response.Message = "Account Not Found"
+		response.Errors = append(response.Errors, response.Message)
+		return c.Status(fiber.StatusNotFound).JSON(response)
+	}
+
+	response.Success = true
+	response.Message = "Account Retrieval Successful"
+	response.Data = user
 	return c.JSON(response)
 
 }
