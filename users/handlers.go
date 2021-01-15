@@ -2,7 +2,6 @@ package users
 
 import (
 	"errors"
-	"fmt"
 	"github.com/anthonyhawkins/savorbook/database"
 	"github.com/anthonyhawkins/savorbook/middleware"
 	"github.com/anthonyhawkins/savorbook/responses"
@@ -42,9 +41,9 @@ func CreateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
-	errors := ValidateRegistration(*registration)
-	if errors != nil {
-		response.Errors = errors
+	errs := ValidateRegistration(*registration)
+	if errs != nil {
+		response.Errors = errs
 		return c.JSON(response)
 	}
 
@@ -164,8 +163,6 @@ func GetAccount(c *fiber.Ctx) error {
 
 	var user = new(User)
 	result := db.First(&user, userId)
-
-	fmt.Println(user.Username)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		response.Message = "Account Not Found"
