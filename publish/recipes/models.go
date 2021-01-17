@@ -7,7 +7,7 @@ import (
 type Recipe struct {
 	database.BaseModel
 	UserID           uint              `json:"userId"`
-	Name             string            `json:"name"              validate:"required,max=32"`
+	Name             string            `json:"name"              validate:"required,max=75"`
 	Description      string            `json:"description"       validate:"required,max=2600"`
 	IngredientGroups []IngredientGroup `json:"ingredientGroups"  validate:"required,dive"       gorm:"constraint:OnDelete:CASCADE"`
 	Steps            []Step            `json:"steps"             validate:"required,dive"       gorm:"constraint:OnDelete:CASCADE"            `
@@ -23,8 +23,8 @@ type IngredientGroup struct {
 type Ingredient struct {
 	database.BaseModel
 	Name              string `json:"name" validate:"required,max=32"`
-	Qty               string `json:"qty"  validate:"numeric,max=3"`
-	Unit              string `json:"unit" validate:"max=12"`
+	Qty               string `json:"qty"  validate:"omitempty,numeric,max=3"`
+	Unit              string `json:"unit" validate:"omitempty,max=12"`
 	IngredientGroupID uint   `json:"ingredientGroupId"`
 }
 

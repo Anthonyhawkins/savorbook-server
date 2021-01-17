@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"github.com/anthonyhawkins/savorbook/config"
 	"github.com/anthonyhawkins/savorbook/responses"
 	"github.com/form3tech-oss/jwt-go"
@@ -46,6 +47,16 @@ func SetToken(userName string, displayName string, email string, userID uint) (s
 func AuthedUserId(token interface{}) uint {
 	userToken := token.(*jwt.Token)
 	claims := userToken.Claims.(jwt.MapClaims)
-	userId, _ := strconv.ParseUint(claims["sub"].(string), 10, 64)
-	return uint(userId)
+	switch v := claims["sub"].(type) {
+	default:
+		fmt.Println("Unknown Type %T", v)
+		//TODO do something if type not recognized
+		return 0
+	case string:
+		userId, _ := strconv.ParseUint(claims["sub"].(string), 10, 64)
+		return uint(userId)
+	case float64:
+		return uint(claims["sub"].(float64))
+	}
+
 }
