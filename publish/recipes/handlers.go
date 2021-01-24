@@ -7,6 +7,7 @@ import (
 	"github.com/anthonyhawkins/savorbook/responses"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"strconv"
 )
 
@@ -44,7 +45,7 @@ func GetRecipe(c *fiber.Ctx) error {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeId,
 		"user_id": userId,
-	}).Preload("Steps").Preload("IngredientGroups.Ingredients").First(&recipe)
+	}).Preload("Steps.StepImages").Preload("IngredientGroups.Ingredients").First(&recipe)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		response.Message = "Recipe Not Found"
@@ -76,7 +77,7 @@ func DeleteRecipe(c *fiber.Ctx) error {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeId,
 		"user_id": userId,
-	}).Preload("Steps").Preload("IngredientGroups.Ingredients").Delete(&Recipe{})
+	}).Preload("Steps").Preload("StepImages").Preload("IngredientGroups.Ingredients").Delete(&Recipe{})
 
 	if result.Error != nil {
 		response.Message = "Unable to Delete Recipe"
@@ -117,7 +118,7 @@ func UpdateRecipe(c *fiber.Ctx) error {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeId,
 		"user_id": userId,
-	}).Preload("Steps").Preload("IngredientGroups.Ingredients").First(&existingRecipe)
+	}).Preload("Steps.StepImages").Preload("IngredientGroups.Ingredients").First(&existingRecipe)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		response.Message = "Recipe Not Found"
@@ -135,9 +136,8 @@ func UpdateRecipe(c *fiber.Ctx) error {
 	*/
 
 	tx := db.Begin()
-
-	tx.Where(map[string]interface{}{"recipe_id": recipeId}).Select("Ingredients").Delete(IngredientGroup{})
-	tx.Where(map[string]interface{}{"recipe_id": recipeId}).Delete(Step{})
+	tx.Where(map[string]interface{}{"recipe_id": recipeId}).Preload("Ingredients").Select(clause.Associations).Delete(IngredientGroup{})
+	tx.Where(map[string]interface{}{"recipe_id": recipeId}).Select(clause.Associations).Delete(Step{})
 	tx.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&recipe)
 
 	if tx.Save(&recipe); tx.Error != nil {

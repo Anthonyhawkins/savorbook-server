@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/anthonyhawkins/savorbook/images"
 	"github.com/anthonyhawkins/savorbook/middleware"
 	"github.com/anthonyhawkins/savorbook/publish/recipes"
 	"github.com/anthonyhawkins/savorbook/users"
@@ -35,8 +36,6 @@ func SetupRoutes(app *fiber.App) {
 	//library := api.Group("/library")
 	//store := api.Group("/store")
 
-	app.Get("/secret", middleware.Protected(), func(c *fiber.Ctx) error {
-		return c.SendString("Super Secret Page")
-	})
+	api.Post("/images", middleware.Protected(), images.UploadImage)
 
 }
