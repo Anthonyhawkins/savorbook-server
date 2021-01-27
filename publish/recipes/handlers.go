@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"strconv"
+	"strings"
 )
 
 func GetRecipes(c *fiber.Ctx) error {
@@ -16,13 +17,20 @@ func GetRecipes(c *fiber.Ctx) error {
 	response.Success = false
 
 	userId := middleware.AuthedUserId(c.Locals("user"))
+	searchString := strings.ToLower(c.Query("name"))
 
 	db := database.GetDB()
-
 	var recipes []Recipe
-	_ = db.Where(map[string]interface{}{
-		"user_id": userId,
-	}).Find(&recipes)
+	selects := []string{"id", "user_id", "name", "image", "description"}
+	if len(searchString) > 0 {
+		_ = db.Select(selects).Where(map[string]interface{}{
+			"user_id": userId,
+		}).Where("LOWER(name) LIKE ?", "%"+searchString+"%").Find(&recipes)
+	} else {
+		_ = db.Select(selects).Where(map[string]interface{}{
+			"user_id": userId,
+		}).Find(&recipes)
+	}
 
 	response.Success = true
 	response.Message = "All Recipes"
@@ -58,6 +66,10 @@ func GetRecipe(c *fiber.Ctx) error {
 		response.Errors = append(response.Errors, response.Message)
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
+
+	db.Model(&Recipe{}).Select("recipes.name as recipe_name, recipe_dependencies.parent_recipe, recipe_dependencies.dependent_recipe, recipe_dependencies.qty").Joins("left join recipe_dependencies on recipe_dependencies.dependent_recipe = recipes.id").Where(map[string]interface{}{
+		"recipe_dependencies.parent_recipe": recipeId,
+	}).Find(&recipe.DependentRecipes)
 
 	response.Success = true
 	response.Data = recipe
@@ -112,6 +124,15 @@ func UpdateRecipe(c *fiber.Ctx) error {
 	userId := middleware.AuthedUserId(c.Locals("user"))
 	recipeId, _ := strconv.ParseUint(c.Params("id"), 10, 64)
 
+	/**
+	Ensure the JSON id is present and matches the URL param for recipe id
+	*/
+	if recipeId != uint64(recipe.ID) {
+		response.Message = "Invalid Format"
+		response.Errors = append(response.Errors, response.Message)
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
 	db := database.GetDB()
 
 	var existingRecipe = new(Recipe)
@@ -138,13 +159,50 @@ func UpdateRecipe(c *fiber.Ctx) error {
 	tx := db.Begin()
 	tx.Where(map[string]interface{}{"recipe_id": recipeId}).Preload("Ingredients").Select(clause.Associations).Delete(IngredientGroup{})
 	tx.Where(map[string]interface{}{"recipe_id": recipeId}).Select(clause.Associations).Delete(Step{})
-	tx.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&recipe)
+	tx.Session(&gorm.Session{FullSaveAssociations: true}).Omit("Steps.ID").Updates(&recipe)
 
 	if tx.Save(&recipe); tx.Error != nil {
 		tx.Rollback()
 		response.Message = "Unable to Update Recipe"
 		response.Errors = append(response.Errors, response.Message)
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	//Delete Dependencies and Re-add them
+	tx.Where(map[string]interface{}{"parent_recipe": recipeId}).Delete(RecipeDependency{})
+	if len(recipe.DependentRecipes) > 0 {
+		var idsToCheck []uint
+		for index, dependency := range recipe.DependentRecipes {
+			/**
+			Assume the dependent recipe exists, collect its ID
+			in the meantime then check against DB when done, once.
+			*/
+			idsToCheck = append(idsToCheck, dependency.DependentRecipe)
+			recipe.DependentRecipes[index].ParentRecipe = recipe.ID
+		}
+
+		//Check the DB to ensure all the dependent recipes exists and the user owns them
+		var recipes []Recipe
+		existResult := db.Where(map[string]interface{}{
+			"user_id": userId,
+		}).Find(&recipes, idsToCheck)
+
+		if existResult.RowsAffected != int64(len(idsToCheck)) {
+			tx.Rollback()
+			response.Message = "One or More Dependent Recipes do not exists."
+			response.Errors = append(response.Errors, response.Message)
+			return c.Status(fiber.StatusNotFound).JSON(response)
+		}
+
+		//Create the Recipe Dependency
+		createResult := tx.Create(recipe.DependentRecipes)
+		if createResult.RowsAffected == 0 {
+			tx.Rollback()
+			response.Message = "Recipe Update Failed"
+			//TODO - Should error be bubbled up DB error to client?
+			response.Errors = append(response.Errors, result.Error.Error())
+			return c.Status(fiber.StatusBadRequest).JSON(response)
+		}
 	}
 
 	tx.Commit()
@@ -179,14 +237,56 @@ func CreateRecipe(c *fiber.Ctx) error {
 	recipe.UserID = userId
 
 	db := database.GetDB()
-	result := db.Create(&recipe)
+	tx := db.Begin()
+	//TODO - Review if anything else should be omitted
+	result := tx.Omit("Steps.ID").Create(&recipe)
 
 	if result.RowsAffected == 0 {
+		tx.Rollback()
 		response.Message = "Recipe Creation Failed"
 		//TODO - Should error be bubbled up DB error to client?
 		response.Errors = append(response.Errors, result.Error.Error())
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
+
+	//Add Dependencies
+	if len(recipe.DependentRecipes) > 0 {
+		var idsToCheck []uint
+		for index, dependency := range recipe.DependentRecipes {
+			/**
+			Assume the dependent recipe exists, collect its ID
+			in the meantime then check against DB when done, once.
+			*/
+			idsToCheck = append(idsToCheck, dependency.DependentRecipe)
+			recipe.DependentRecipes[index].ParentRecipe = recipe.ID
+		}
+
+		//Check the DB to ensure all the dependent recipes exists and the user owns them
+		var recipes []Recipe
+		existResult := db.Where(map[string]interface{}{
+			"user_id": userId,
+		}).Find(&recipes, idsToCheck)
+
+		if existResult.RowsAffected != int64(len(idsToCheck)) {
+			tx.Rollback()
+			response.Message = "One or More Dependent Recipes do not exists."
+			response.Errors = append(response.Errors, response.Message)
+			return c.Status(fiber.StatusNotFound).JSON(response)
+		}
+
+		//Create the Recipe Dependency
+		createResult := tx.Create(recipe.DependentRecipes)
+		if createResult.RowsAffected == 0 {
+			tx.Rollback()
+			response.Message = "Recipe Creation Failed"
+			//TODO - Should error be bubbled up DB error to client?
+			response.Errors = append(response.Errors, result.Error.Error())
+			return c.Status(fiber.StatusBadRequest).JSON(response)
+		}
+	}
+
+	tx.Commit()
+	//Respond with Success
 	response.Success = true
 	response.Data = recipe
 	return c.Status(fiber.StatusCreated).JSON(response)

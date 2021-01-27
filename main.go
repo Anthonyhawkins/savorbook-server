@@ -19,6 +19,7 @@ func Migrate(db *gorm.DB) {
 	db.Migrator().DropTable(&recipes.Ingredient{})
 	db.Migrator().DropTable(&recipes.Step{})
 	db.Migrator().DropTable(&recipes.StepImage{})
+	db.Migrator().DropTable(&recipes.RecipeDependency{})
 	//db.Migrator().DropTable(&users.User{})
 
 	db.AutoMigrate(&users.User{})
@@ -27,6 +28,7 @@ func Migrate(db *gorm.DB) {
 	db.AutoMigrate(&recipes.Ingredient{})
 	db.AutoMigrate(&recipes.Step{})
 	db.AutoMigrate(&recipes.StepImage{})
+	db.AutoMigrate(&recipes.RecipeDependency{})
 	db.AutoMigrate(&images.Image{})
 }
 

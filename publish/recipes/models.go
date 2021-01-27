@@ -6,12 +6,13 @@ import (
 
 type Recipe struct {
 	database.BaseModel
-	UserID           uint              `json:"userId"`
-	Name             string            `json:"name"              validate:"required,max=75"`
-	Image            string            `json:"image"             validate:"omitempty,url"`
-	Description      string            `json:"description"       validate:"required,max=2600"`
-	IngredientGroups []IngredientGroup `json:"ingredientGroups"  validate:"required,dive"       gorm:"constraint:OnDelete:CASCADE"`
-	Steps            []Step            `json:"steps"             validate:"required,dive"       gorm:"constraint:OnDelete:CASCADE"            `
+	UserID           uint               `json:"userId"`
+	Name             string             `json:"name"                validate:"required,max=75"`
+	Image            string             `json:"image"               validate:"omitempty,url"`
+	DependentRecipes []RecipeDependency `json:"dependentRecipes"    gorm:"-"`
+	Description      string             `json:"description"         validate:"required,max=2600"`
+	IngredientGroups []IngredientGroup  `json:"ingredientGroups"    validate:"required,dive"       gorm:"constraint:OnDelete:CASCADE"`
+	Steps            []Step             `json:"steps"               validate:"required,dive"       gorm:"constraint:OnDelete:CASCADE"            `
 }
 
 type IngredientGroup struct {
@@ -37,9 +38,20 @@ type Step struct {
 	RecipeID   uint        `json:"recipeId"`
 }
 
+//TODO Add validations
 type StepImage struct {
 	database.BaseModel
 	Image  string `json:"src"`
 	Text   string `json:"text"`
 	StepID uint   `json:"stepId"`
+}
+
+//TODO Add Validations
+//TODO Set Primary Key
+type RecipeDependency struct {
+	database.BaseModel
+	RecipeName      string `json:"name"         gorm:"->"` // readonly, but allow gorm to populate struct field for joins.
+	ParentRecipe    uint   `json:"parentRecipe" gorm:"foreignKey:RecipeID"`
+	DependentRecipe uint   `json:"id"           gorm:"foreignKey:RecipeID"`
+	Qty             string `json:"qty"`
 }
