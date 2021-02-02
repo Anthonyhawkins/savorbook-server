@@ -14,21 +14,21 @@ import (
 
 func Migrate(db *gorm.DB) {
 
-	db.Migrator().DropTable(&recipes.Recipe{})
-	db.Migrator().DropTable(&recipes.IngredientGroup{})
-	db.Migrator().DropTable(&recipes.Ingredient{})
-	db.Migrator().DropTable(&recipes.Step{})
-	db.Migrator().DropTable(&recipes.StepImage{})
-	db.Migrator().DropTable(&recipes.RecipeDependency{})
-	//db.Migrator().DropTable(&users.User{})
+	db.Migrator().DropTable(&recipes.RecipeModel{})
+	db.Migrator().DropTable(&recipes.IngredientGroupModel{})
+	db.Migrator().DropTable(&recipes.IngredientModel{})
+	db.Migrator().DropTable(&recipes.StepModel{})
+	db.Migrator().DropTable(&recipes.StepImageModel{})
+	db.Migrator().DropTable(&recipes.RecipeDependencyModel{})
+	//db.Migrator().DropTable(&users.UserModel{})
 
-	db.AutoMigrate(&users.User{})
-	db.AutoMigrate(&recipes.Recipe{})
-	db.AutoMigrate(&recipes.IngredientGroup{})
-	db.AutoMigrate(&recipes.Ingredient{})
-	db.AutoMigrate(&recipes.Step{})
-	db.AutoMigrate(&recipes.StepImage{})
-	db.AutoMigrate(&recipes.RecipeDependency{})
+	db.AutoMigrate(&users.UserModel{})
+	db.AutoMigrate(&recipes.RecipeModel{})
+	db.AutoMigrate(&recipes.IngredientGroupModel{})
+	db.AutoMigrate(&recipes.IngredientModel{})
+	db.AutoMigrate(&recipes.StepModel{})
+	db.AutoMigrate(&recipes.StepImageModel{})
+	db.AutoMigrate(&recipes.RecipeDependencyModel{})
 	db.AutoMigrate(&images.Image{})
 }
 

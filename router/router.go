@@ -15,23 +15,23 @@ func SetupRoutes(app *fiber.App) {
 		return c.SendString("Hello, World 👋!")
 	})
 
-	app.Post("/test", middleware.Protected(), recipes.CreateRecipe)
+	//app.Post("/test", middleware.Protected(), recipes.CreateRecipe)
 
 	api := app.Group("/api")
 
 	//Auth
 	auth := api.Group("/auth")
-	auth.Post("/register", users.CreateUser)
-	auth.Post("/login", users.LogInUser)
+	auth.Post("/register", users.UserCreate)
+	auth.Post("/login", users.UserLogin)
 	auth.Get("/account", middleware.Protected(), users.GetAccount)
 
 	// Publishing
 	publish := api.Group("/publish")
-	publish.Post("/recipes", middleware.Protected(), recipes.CreateRecipe)
-	publish.Get("/recipes", middleware.Protected(), recipes.GetRecipes)
-	publish.Get("/recipes/:id", middleware.Protected(), recipes.GetRecipe)
-	publish.Put("/recipes/:id", middleware.Protected(), recipes.UpdateRecipe)
-	publish.Delete("/recipes/:id", middleware.Protected(), recipes.DeleteRecipe)
+	publish.Post("/recipes", middleware.Protected(), recipes.RecipeCreate)
+	publish.Get("/recipes", middleware.Protected(), recipes.RecipeList)
+	publish.Get("/recipes/:id", middleware.Protected(), recipes.RecipeGet)
+	publish.Put("/recipes/:id", middleware.Protected(), recipes.RecipeUpdate)
+	publish.Delete("/recipes/:id", middleware.Protected(), recipes.RecipeDelete)
 
 	//library := api.Group("/library")
 	//store := api.Group("/store")

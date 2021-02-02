@@ -53,8 +53,8 @@ func AuthedUserId(token interface{}) uint {
 		//TODO do something if type not recognized
 		return 0
 	case string:
-		userId, _ := strconv.ParseUint(claims["sub"].(string), 10, 64)
-		return uint(userId)
+		userID, _ := strconv.ParseUint(claims["sub"].(string), 10, 64)
+		return uint(userID)
 	case float64:
 		return uint(claims["sub"].(float64))
 	}
