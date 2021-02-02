@@ -4,17 +4,42 @@ import (
 	"github.com/anthonyhawkins/savorbook/database"
 )
 
-/**
-Data to be modeled into the Database
-*/
-
-type User struct {
+type UserModel struct {
 	database.BaseModel
-	Username     string `gorm:"column:username;unique_index" json:"username"`
-	Email        string `gorm:"column:email;unique_index" json:"email"`
-	DisplayName  string `gorm:"column:display_name" json:"displayName"`
-	Bio          string `gorm:"column:bio" json:"bio"`
-	Salt         string `gorm:"column:salt" json:"-"`
-	PasswordHash string `gorm:"column:password_hash" json:"-"`
-	Status       string `gorm:"column:status" json:"-"`
+	Username     string `gorm:"unique_index"`
+	Email        string `gorm:"unique_index"`
+	DisplayName  string
+	Bio          string
+	Salt         string
+	PasswordHash string
+	Status       string
+}
+
+func (model *UserModel) Exists() bool {
+	db := database.GetDB()
+	var existingUsers []UserModel
+	db.Where("username = ?", model.Username).Or("email = ?", model.Email).Find(&existingUsers)
+	if len(existingUsers) > 0 {
+		return true
+	}
+	return false
+}
+
+func (model *UserModel) Create() {
+	db := database.GetDB()
+	db.Create(&model)
+}
+
+func (model *UserModel) Get() {
+	db := database.GetDB()
+	query := map[string]interface{}{"email": model.Email}
+	db.Where(query).Find(&model)
+}
+
+func FindOne(userID uint) (*UserModel, error) {
+	// Retrieve Existing User and ensure password matches
+	db := database.GetDB()
+	var user = new(UserModel)
+	result := db.First(&user, userID)
+	return user, result.Error
 }

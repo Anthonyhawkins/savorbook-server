@@ -2,10 +2,8 @@ package users
 
 import (
 	"errors"
-	"github.com/anthonyhawkins/savorbook/database"
 	"github.com/anthonyhawkins/savorbook/middleware"
 	"github.com/anthonyhawkins/savorbook/responses"
-	"github.com/form3tech-oss/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -28,124 +26,111 @@ func checkPassword(loginPassword string, userPassword string) bool {
 	return true
 }
 
-func CreateUser(c *fiber.Ctx) error {
-
+func UserCreate(c *fiber.Ctx) error {
 	response := new(responses.StandardResponse)
 	response.Success = false
 
-	registration := new(RegisterForm)
-	err := c.BodyParser(registration)
+	registrationValidator := NewRegisterValidator()
+	err := c.BodyParser(registrationValidator)
 	if err != nil {
 		response.Message = "Invalid JSON"
 		response.Errors = append(response.Errors, err.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
 	}
 
-	errs := ValidateRegistration(*registration)
+	errs, err := registrationValidator.Validate()
 	if errs != nil {
 		response.Errors = errs
 		return c.JSON(response)
 	}
 
-	//Check to see if username and email is already in use.
-	db := database.GetDB()
+	if err := registrationValidator.BindModel(); err != nil {
+		response.Message = "Unable to Create User"
+		response.Errors = append(response.Errors, err.Error())
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
+	}
 
-	var existingUsers []User
-	db.Where("username = ?", registration.Username).Or("email = ?", registration.Email).Find(&existingUsers)
-
-	if len(existingUsers) > 0 {
+	if registrationValidator.Model.Exists() {
 		response.Message = "Username and or Email already in use."
-		for _, existingUser := range existingUsers {
-			if existingUser.Email == registration.Email {
-				response.Errors = append(response.Errors, "An account with this email already exists.")
-			}
-			if existingUser.Username == registration.Username {
-				response.Errors = append(response.Errors, "This username has already been taken.")
-			}
-		}
+		response.Errors = append(response.Errors, response.Message)
 		return c.JSON(response)
 	}
 
-	// create the new user
-	user := new(User)
-	user.PasswordHash = setPassword(registration.Password)
-	user.Username = registration.Username
-	user.DisplayName = registration.DisplayName
-	user.Email = registration.Email
-	db.Create(&user)
+	registrationValidator.Model.PasswordHash = setPassword(registrationValidator.Registration.Password)
+	registrationValidator.Model.Create()
 
 	//generate JWT Token
-	signedToken, err := middleware.SetToken(user.Username, user.DisplayName, user.Email, user.ID)
+	signedToken, err := middleware.SetToken(
+		registrationValidator.Model.Username,
+		registrationValidator.Model.DisplayName,
+		registrationValidator.Model.Email,
+		registrationValidator.Model.ID,
+	)
 	if err != nil {
 		response.Message = "Login Error"
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
+	var loginResponse LoginResponse
+	loginResponse.SerializeLogin(&registrationValidator.Model, signedToken)
+
 	response.Success = true
 	response.Message = "Registration Successful"
-
-	response.Data = struct {
-		AccessToken string `json:"accessToken"`
-		UserId      uint   `json:"userId"`
-		Username    string `json:"username"`
-		DisplayName string `json:"displayName"`
-	}{
-		AccessToken: signedToken,
-		UserId:      user.ID,
-		Username:    user.Username,
-		DisplayName: user.DisplayName,
-	}
-
+	response.Data = loginResponse
 	return c.Status(fiber.StatusCreated).JSON(response)
+
 }
 
-func LogInUser(c *fiber.Ctx) error {
-
+func UserLogin(c *fiber.Ctx) error {
 	response := new(responses.StandardResponse)
 	response.Success = false
 
-	//Parse Login Form
-	login := new(LoginForm)
-	err := c.BodyParser(login)
+	loginValidator := NewLoginValidator()
+	err := c.BodyParser(loginValidator)
 	if err != nil {
 		response.Message = "Invalid JSON"
 		response.Errors = append(response.Errors, err.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
 	}
 
-	// Retrieve Existing User and ensure password matches
-	db := database.GetDB()
-	query := map[string]interface{}{"email": login.Email}
-	var user = new(User)
-	db.Where(query).Find(&user)
+	errs, err := loginValidator.Validate()
+	if errs != nil {
+		response.Errors = errs
+		return c.JSON(response)
+	}
 
-	if !checkPassword(login.Password, user.PasswordHash) {
+	if err := loginValidator.BindModel(); err != nil {
+		response.Message = "Unable Login User"
+		response.Errors = append(response.Errors, err.Error())
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
+	}
+
+	loginValidator.Model.Get()
+	if !checkPassword(loginValidator.Login.Password, loginValidator.Model.PasswordHash) {
 		response.Message = "Invalid Login"
 		response.Errors = append(response.Errors, "Unauthorized")
 		return c.Status(fiber.StatusUnauthorized).JSON(response)
 	}
 
-	//generate JWT Token and return with user data
-	signedToken, err := middleware.SetToken(user.Username, user.DisplayName, user.Email, user.ID)
+	//generate JWT Token
+	signedToken, err := middleware.SetToken(
+		loginValidator.Model.Username,
+		loginValidator.Model.DisplayName,
+		loginValidator.Model.Email,
+		loginValidator.Model.ID,
+	)
 	if err != nil {
 		response.Message = "Login Error"
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
+	var loginResponse LoginResponse
+	loginResponse.SerializeLogin(&loginValidator.Model, signedToken)
+
 	response.Success = true
 	response.Message = "Login Successful"
-
-	response.Data = struct {
-		AccessToken string `json:"accessToken"`
-		UserId      uint   `json:"userId"`
-		DisplayName string `json:"displayName"`
-	}{
-		AccessToken: signedToken,
-		UserId:      user.ID,
-		DisplayName: user.DisplayName,
-	}
-
-	return c.JSON(response)
+	response.Data = loginResponse
+	return c.Status(fiber.StatusCreated).JSON(response)
 
 }
 
@@ -154,25 +139,21 @@ func GetAccount(c *fiber.Ctx) error {
 	response := new(responses.StandardResponse)
 	response.Success = false
 
-	userToken := c.Locals("user").(*jwt.Token)
-	claims := userToken.Claims.(jwt.MapClaims)
-	userId := claims["sub"]
+	userID := middleware.AuthedUserId(c.Locals("user"))
 
-	// Retrieve Existing User and ensure password matches
-	db := database.GetDB()
-
-	var user = new(User)
-	result := db.First(&user, userId)
-
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	userModel, err := FindOne(userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		response.Message = "Account Not Found"
 		response.Errors = append(response.Errors, response.Message)
 		return c.Status(fiber.StatusNotFound).JSON(response)
 	}
 
+	var userResponse UserResponse
+	userResponse.SerializeUser(userModel)
+
 	response.Success = true
 	response.Message = "Account Retrieval Successful"
-	response.Data = user
+	response.Data = userResponse
 	return c.JSON(response)
 
 }
