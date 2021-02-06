@@ -29,6 +29,7 @@ func SetupRoutes(app *fiber.App) {
 	publish := api.Group("/publish")
 	publish.Post("/recipes", middleware.Protected(), recipes.RecipeCreate)
 	publish.Get("/recipes", middleware.Protected(), recipes.RecipeList)
+	publish.Get("/recipes/tags", middleware.Protected(), recipes.TagList)
 	publish.Get("/recipes/:id", middleware.Protected(), recipes.RecipeGet)
 	publish.Put("/recipes/:id", middleware.Protected(), recipes.RecipeUpdate)
 	publish.Delete("/recipes/:id", middleware.Protected(), recipes.RecipeDelete)

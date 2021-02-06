@@ -15,6 +15,10 @@ import (
 func Migrate(db *gorm.DB) {
 
 	db.Migrator().DropTable(&recipes.RecipeModel{})
+	db.Migrator().DropTable(&recipes.TagModel{})
+	type RecipeTags struct {
+	}
+	db.Migrator().DropTable(&RecipeTags{})
 	db.Migrator().DropTable(&recipes.IngredientGroupModel{})
 	db.Migrator().DropTable(&recipes.IngredientModel{})
 	db.Migrator().DropTable(&recipes.StepModel{})
@@ -24,6 +28,7 @@ func Migrate(db *gorm.DB) {
 
 	db.AutoMigrate(&users.UserModel{})
 	db.AutoMigrate(&recipes.RecipeModel{})
+	db.AutoMigrate(&recipes.TagModel{})
 	db.AutoMigrate(&recipes.IngredientGroupModel{})
 	db.AutoMigrate(&recipes.IngredientModel{})
 	db.AutoMigrate(&recipes.StepModel{})

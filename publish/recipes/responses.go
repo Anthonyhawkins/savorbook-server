@@ -5,6 +5,9 @@ type RecipeResponse struct {
 	Name             string                    `json:"name"`
 	Image            string                    `json:"image"`
 	Description      string                    `json:"description"`
+	PrepTime         string                    `json:"prepTime"`
+	Servings         string                    `json:"servings"`
+	Tags             []string                  `json:"tags"`
 	ParentRecipes    []ParentRecipeResponse    `json:"parentRecipes"`
 	DependentRecipes []DependentRecipeResponse `json:"dependentRecipes"`
 	IngredientGroups []IngredientGroupResponse `json:"ingredientGroups"`
@@ -45,7 +48,7 @@ type StepResponse struct {
 
 type StepImageResponse struct {
 	ID    uint   `json:"id"`
-	Image string `json:"image"`
+	Image string `json:"src"`
 	Text  string `json:"text"`
 }
 
@@ -53,11 +56,22 @@ func (r *RecipeResponse) SerializeRecipe(model *RecipeModel) {
 	r.ID = model.ID
 	r.Name = model.Name
 	r.Description = model.Description
+	r.PrepTime = model.PrepTime
+	r.Servings = model.Servings
+	r.Tags = SerializeTags(model.Tags)
 	r.serializeDependentRecipes(model.DependentRecipes)
 	r.Image = model.Image
 	r.serializeSteps(model.Steps)
 	r.serializeIngredientGroups(model.IngredientGroups)
 	r.ParentRecipes = SerializeParentRecipes(model.ParentRecipes)
+}
+
+func SerializeTags(tagModels []TagModel) []string {
+	tags := make([]string, 0)
+	for _, tagModel := range tagModels {
+		tags = append(tags, tagModel.Tag)
+	}
+	return tags
 }
 
 func (r *RecipeResponse) serializeDependentRecipes(recipeDependencies []RecipeDependencyModel) {

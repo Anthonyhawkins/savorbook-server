@@ -6,6 +6,7 @@ import (
 	"github.com/anthonyhawkins/savorbook/database"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"strings"
 )
 
 type RecipeModel struct {
@@ -13,11 +14,21 @@ type RecipeModel struct {
 	UserID           uint
 	Name             string
 	Image            string
+	Description      string
+	PrepTime         string
+	Servings         string
+	Tags             []TagModel              `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE"`
 	DependentRecipes []RecipeDependencyModel `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE"`
 	ParentRecipes    []RecipeDependencyModel `gorm:"-"`
-	Description      string
-	IngredientGroups []IngredientGroupModel `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE"`
-	Steps            []StepModel            `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE"`
+	IngredientGroups []IngredientGroupModel  `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE"`
+	Steps            []StepModel             `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE"`
+}
+
+type TagModel struct {
+	gorm.Model
+	RecipeID uint
+	UserID   uint
+	Tag      string
 }
 
 type IngredientGroupModel struct {
@@ -127,6 +138,8 @@ func (model *RecipeModel) Update() error {
 	in another list and send that as well or as a different call. Then delete the ids here.
 	*/
 	tx := db.Begin()
+	//tx.Model(&model).Association("Tags").Replace(model.Tags)
+	tx.Where(map[string]interface{}{"recipe_id": model.ID}).Select(clause.Associations).Delete(&TagModel{})
 	tx.Where(map[string]interface{}{"recipe_id": model.ID}).Select(clause.Associations).Delete(&IngredientGroupModel{})
 	tx.Where(map[string]interface{}{"recipe_id": model.ID}).Select(clause.Associations).Delete(&StepModel{})
 	tx.Where(map[string]interface{}{"recipe_id": model.ID}).Select(clause.Associations).Delete(&RecipeDependencyModel{})
@@ -139,6 +152,21 @@ func (model *RecipeModel) Update() error {
 	tx.Commit()
 
 	return nil
+}
+
+func (model *RecipeModel) setTags(tags []string) error {
+	var tagList []TagModel
+
+	for _, tag := range tags {
+		var tagModel TagModel
+		tagModel.UserID = model.UserID
+		tagModel.Tag = tag
+		tagList = append(tagList, tagModel)
+	}
+
+	model.Tags = tagList
+	return nil
+
 }
 
 func (model *RecipeModel) CheckDependencies(db *gorm.DB) error {
@@ -244,7 +272,7 @@ func GetRecipe(recipeID string, userID uint) (RecipeModel, error) {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeID,
 		"user_id": userID,
-	}).Find(&model)
+	}).Preload("Tags").Find(&model)
 
 	return model, result.Error
 }
@@ -256,7 +284,7 @@ func GetRecipeFull(recipeID string, userID uint) (RecipeModel, error) {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeID,
 		"user_id": userID,
-	}).Preload("Steps.StepImages").Preload("IngredientGroups.Ingredients").First(&model)
+	}).Preload("Tags").Preload("Steps.StepImages").Preload("IngredientGroups.Ingredients").First(&model)
 
 	if result.Error != nil {
 		return model, result.Error
@@ -290,23 +318,56 @@ func GetRecipes(userID uint) ([]RecipeModel, error) {
 	db := database.GetDB()
 	var recipes []RecipeModel
 
-	selects := []string{"id", "user_id", "name", "image", "description"}
+	selects := []string{"id", "user_id", "name", "image", "description", "prep_time", "servings"}
 	result := db.Select(selects).Where(map[string]interface{}{
 		"user_id": userID,
-	}).Find(&recipes)
+	}).Preload("Tags").Find(&recipes)
 
 	return recipes, result.Error
 }
 
-func FindRecipes(userID uint, searchString string) ([]RecipeModel, error) {
+func FindRecipesByName(userID uint, searchString string) ([]RecipeModel, error) {
 
 	db := database.GetDB()
 	var recipes []RecipeModel
 
-	selects := []string{"id", "user_id", "name", "image", "description"}
+	selects := []string{"id", "user_id", "name", "image", "description", "prep_time", "servings"}
 	result := db.Select(selects).Where(map[string]interface{}{
 		"user_id": userID,
 	}).Where("LOWER(name) LIKE ?", "%"+searchString+"%").Find(&recipes)
 
 	return recipes, result.Error
+}
+
+func FindRecipesByTags(userID uint, searchString string) ([]RecipeModel, error) {
+
+	tags := strings.Split(strings.ToLower(searchString), ",")
+
+	db := database.GetDB()
+	var recipes []RecipeModel
+
+	result := db.Model(&RecipeModel{}).Distinct().Preload("Tags").Joins(
+		`left join tag_models 
+        on tag_models.recipe_id = recipe_models.id`,
+	).Where(map[string]interface{}{
+		"tag_models.user_id":    userID,
+		"tag_models.deleted_at": nil,
+	}).Where("tag_models.tag IN ?", tags).Find(&recipes)
+
+	if result.Error != nil {
+		return recipes, result.Error
+	}
+
+	return recipes, result.Error
+}
+
+func GetTags(userID uint) ([]TagModel, error) {
+
+	db := database.GetDB()
+	var tags []TagModel
+	result := db.Where(map[string]interface{}{
+		"user_id": userID,
+	}).Distinct("tag").Order("tag").Find(&tags)
+
+	return tags, result.Error
 }

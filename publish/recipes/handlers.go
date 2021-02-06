@@ -30,13 +30,11 @@ func RecipeCreate(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
 	}
 
-	if err := recipeValidator.BindModel(); err != nil {
+	if err := recipeValidator.BindModel(userID); err != nil {
 		response.Message = "Unable to Create Recipe"
 		response.Errors = append(response.Errors, err.Error())
 		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
 	}
-
-	recipeValidator.Model.UserID = userID
 
 	if err := SaveRecipe(&recipeValidator.Model); err != nil {
 		response.Message = "Unable to Create Recipe"
@@ -84,18 +82,36 @@ func RecipeGet(c *fiber.Ctx) error {
 
 }
 
+func TagList(c *fiber.Ctx) error {
+	response := new(responses.StandardResponse)
+	response.Success = false
+	userID := middleware.AuthedUserId(c.Locals("user"))
+
+	tags, _ := GetTags(userID)
+	tagResponse := SerializeTags(tags)
+
+	response.Success = true
+	response.Data = tagResponse
+	response.Errors = append(response.Errors, response.Message)
+	return c.JSON(response)
+
+}
+
 func RecipeList(c *fiber.Ctx) error {
 	response := new(responses.StandardResponse)
 	response.Success = false
 	userID := middleware.AuthedUserId(c.Locals("user"))
-	searchString := strings.ToLower(c.Query("name"))
-
+	byName := strings.ToLower(c.Query("name"))
+	byTags := strings.ToLower(c.Query("tags"))
 	var recipeList []RecipeResponse
 
 	var recipes []RecipeModel
 	var err error
-	if len(searchString) > 0 {
-		recipes, err = FindRecipes(userID, searchString)
+
+	if len(byName) > 0 {
+		recipes, err = FindRecipesByName(userID, byName)
+	} else if len(byTags) > 0 {
+		recipes, err = FindRecipesByTags(userID, byTags)
 	} else {
 		recipes, err = GetRecipes(userID)
 	}
@@ -155,14 +171,13 @@ func RecipeUpdate(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
 	}
 
-	if err := recipeValidator.BindModel(); err != nil {
+	if err := recipeValidator.BindModel(userId); err != nil {
 		response.Message = "Unable to Update Recipe"
 		response.Errors = append(response.Errors, err.Error())
 		return c.Status(fiber.StatusUnprocessableEntity).JSON(response)
 	}
 
 	recipeValidator.Model.ID = existingRecipe.ID
-	recipeValidator.Model.UserID = existingRecipe.UserID
 
 	if err := recipeValidator.Model.Update(); err != nil {
 		response.Message = "Unable to Update Recipe"

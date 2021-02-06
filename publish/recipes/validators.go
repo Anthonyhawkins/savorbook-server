@@ -5,8 +5,11 @@ import "github.com/go-playground/validator/v10"
 type RecipeValidator struct {
 	Recipe struct {
 		Name             string                      `json:"name"                validate:"required,max=75"`
-		Image            string                      `json:"image"               validate:"omitempty,url"`
+		Image            string                      `json:"image"               validate:"omitempty"`
 		Description      string                      `json:"description"         validate:"max=2600"`
+		PrepTime         string                      `json:"prepTime"            validate:"max=120"`
+		Servings         string                      `json:"servings"            validate:"max=120"`
+		Tags             []string                    `json:"tags"                validate:"dive,alphanum"`
 		DependentRecipes []RecipeDependencyValidator `json:"dependentRecipes"`
 		IngredientGroups []IngredientGroupValidator  `json:"ingredientGroups"    validate:"required,dive"`
 		Steps            []StepValidator             `json:"steps"               validate:"required,dive"`
@@ -26,7 +29,7 @@ type IngredientGroupValidator struct {
 
 type IngredientValidator struct {
 	Name string `json:"name" validate:"required,max=32"`
-	Qty  string `json:"qty"  validate:"omitempty,max=4"`
+	Qty  string `json:"qty"  validate:"omitempty,max=6"`
 	Unit string `json:"unit" validate:"omitempty,max=12"`
 }
 
@@ -60,10 +63,16 @@ func (v *RecipeValidator) Validate() ([]string, error) {
 	return errors, err
 }
 
-func (v *RecipeValidator) BindModel() error {
+func (v *RecipeValidator) BindModel(userID uint) error {
+	v.Model.UserID = userID
 	v.Model.Name = v.Recipe.Name
 	v.Model.Description = v.Recipe.Description
+	v.Model.PrepTime = v.Recipe.PrepTime
+	v.Model.Servings = v.Recipe.Servings
 	v.Model.Image = v.Recipe.Image
+	if err := v.Model.setTags(v.Recipe.Tags); err != nil {
+		return err
+	}
 	if err := v.Model.setSteps(v.Recipe.Steps); err != nil {
 		return err
 	}
