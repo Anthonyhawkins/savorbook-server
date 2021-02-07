@@ -272,7 +272,9 @@ func GetRecipe(recipeID string, userID uint) (RecipeModel, error) {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeID,
 		"user_id": userID,
-	}).Preload("Tags").Find(&model)
+	}).Preload("Tags", func(db *gorm.DB) *gorm.DB {
+		return db.Order("tag_models.tag")
+	}).Find(&model)
 
 	return model, result.Error
 }
@@ -284,7 +286,9 @@ func GetRecipeFull(recipeID string, userID uint) (RecipeModel, error) {
 	result := db.Where(map[string]interface{}{
 		"id":      recipeID,
 		"user_id": userID,
-	}).Preload("Tags").Preload("Steps.StepImages").Preload("IngredientGroups.Ingredients").First(&model)
+	}).Preload("Tags", func(db *gorm.DB) *gorm.DB {
+		return db.Order("tag_models.tag")
+	}).Preload("Steps.StepImages").Preload("IngredientGroups.Ingredients").First(&model)
 
 	if result.Error != nil {
 		return model, result.Error
@@ -313,40 +317,44 @@ func GetRecipeFull(recipeID string, userID uint) (RecipeModel, error) {
 	return model, err
 }
 
-func GetRecipes(userID uint) ([]RecipeModel, error) {
+func GetRecipes(userID uint, pageNum string, pageSize string) ([]RecipeModel, error) {
 
 	db := database.GetDB()
 	var recipes []RecipeModel
 
 	selects := []string{"id", "user_id", "name", "image", "description", "prep_time", "servings"}
-	result := db.Select(selects).Where(map[string]interface{}{
+	result := db.Scopes(database.Paginate(pageNum, pageSize)).Select(selects).Where(map[string]interface{}{
 		"user_id": userID,
-	}).Preload("Tags").Find(&recipes)
+	}).Preload("Tags", func(db *gorm.DB) *gorm.DB {
+		return db.Order("tag_models.tag")
+	}).Find(&recipes)
 
 	return recipes, result.Error
 }
 
-func FindRecipesByName(userID uint, searchString string) ([]RecipeModel, error) {
+func FindRecipesByName(userID uint, searchString string, pageNum string, pageSize string) ([]RecipeModel, error) {
 
 	db := database.GetDB()
 	var recipes []RecipeModel
 
 	selects := []string{"id", "user_id", "name", "image", "description", "prep_time", "servings"}
-	result := db.Select(selects).Where(map[string]interface{}{
+	result := db.Scopes(database.Paginate(pageNum, pageSize)).Select(selects).Where(map[string]interface{}{
 		"user_id": userID,
 	}).Where("LOWER(name) LIKE ?", "%"+searchString+"%").Find(&recipes)
 
 	return recipes, result.Error
 }
 
-func FindRecipesByTags(userID uint, searchString string) ([]RecipeModel, error) {
+func FindRecipesByTags(userID uint, searchString string, pageNum string, pageSize string) ([]RecipeModel, error) {
 
 	tags := strings.Split(strings.ToLower(searchString), ",")
 
 	db := database.GetDB()
 	var recipes []RecipeModel
 
-	result := db.Model(&RecipeModel{}).Distinct().Preload("Tags").Joins(
+	result := db.Scopes(database.Paginate(pageNum, pageSize)).Model(&RecipeModel{}).Distinct().Preload("Tags", func(db *gorm.DB) *gorm.DB {
+		return db.Order("tag_models.tag")
+	}).Joins(
 		`left join tag_models 
         on tag_models.recipe_id = recipe_models.id`,
 	).Where(map[string]interface{}{

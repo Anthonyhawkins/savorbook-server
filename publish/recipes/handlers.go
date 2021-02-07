@@ -103,17 +103,21 @@ func RecipeList(c *fiber.Ctx) error {
 	userID := middleware.AuthedUserId(c.Locals("user"))
 	byName := strings.ToLower(c.Query("name"))
 	byTags := strings.ToLower(c.Query("tags"))
-	var recipeList []RecipeResponse
+
+	pageNum := strings.ToLower(c.Query("page"))
+	pageSize := strings.ToLower(c.Query("page_size"))
+
+	recipeList := make([]RecipeResponse, 0)
 
 	var recipes []RecipeModel
 	var err error
 
 	if len(byName) > 0 {
-		recipes, err = FindRecipesByName(userID, byName)
+		recipes, err = FindRecipesByName(userID, byName, pageNum, pageSize)
 	} else if len(byTags) > 0 {
-		recipes, err = FindRecipesByTags(userID, byTags)
+		recipes, err = FindRecipesByTags(userID, byTags, pageNum, pageSize)
 	} else {
-		recipes, err = GetRecipes(userID)
+		recipes, err = GetRecipes(userID, pageNum, pageSize)
 	}
 
 	if err != nil {
