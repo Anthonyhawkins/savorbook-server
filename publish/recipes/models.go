@@ -340,7 +340,9 @@ func FindRecipesByName(userID uint, searchString string, pageNum string, pageSiz
 	selects := []string{"id", "user_id", "name", "image", "description", "prep_time", "servings"}
 	result := db.Scopes(database.Paginate(pageNum, pageSize)).Select(selects).Where(map[string]interface{}{
 		"user_id": userID,
-	}).Where("LOWER(name) LIKE ?", "%"+searchString+"%").Find(&recipes)
+	}).Where("LOWER(name) LIKE ?", "%"+searchString+"%").Preload("Tags", func(db *gorm.DB) *gorm.DB {
+		return db.Order("tag_models.tag")
+	}).Find(&recipes)
 
 	return recipes, result.Error
 }
