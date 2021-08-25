@@ -11,6 +11,7 @@ require (
 	github.com/gofiber/jwt/v2 v2.1.0
 	github.com/joho/godotenv v1.3.0
 	github.com/klauspost/compress v1.11.6 // indirect
+	github.com/lib/pq v1.3.0
 	github.com/valyala/fasthttp v1.19.0 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/oauth2 v0.0.0-20210113205817-d3ed898aa8a3
