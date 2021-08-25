@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/anthonyhawkins/savorbook/database"
 	"github.com/anthonyhawkins/savorbook/images"
+	"github.com/anthonyhawkins/savorbook/publish/cookbooks"
 	"github.com/anthonyhawkins/savorbook/publish/recipes"
 	"github.com/anthonyhawkins/savorbook/router"
 	"github.com/anthonyhawkins/savorbook/users"
@@ -14,7 +15,9 @@ import (
 
 func Migrate(db *gorm.DB) {
 
-	/*	db.Migrator().DropTable(&recipes.RecipeModel{})
+	/*	db.Migrator().DropTable(&cookbooks.CookbookModel{})
+		db.Migrator().DropTable(&cookbooks.SectionModel{})
+		db.Migrator().DropTable(&recipes.RecipeModel{})
 		db.Migrator().DropTable(&recipes.TagModel{})
 		type RecipeTags struct {
 		}
@@ -23,7 +26,8 @@ func Migrate(db *gorm.DB) {
 		db.Migrator().DropTable(&recipes.IngredientModel{})
 		db.Migrator().DropTable(&recipes.StepModel{})
 		db.Migrator().DropTable(&recipes.StepImageModel{})
-		db.Migrator().DropTable(&recipes.RecipeDependencyModel{})*/
+		db.Migrator().DropTable(&recipes.RecipeDependencyModel{})
+	*/
 	//db.Migrator().DropTable(&users.UserModel{})
 
 	db.AutoMigrate(&users.UserModel{})
@@ -35,6 +39,9 @@ func Migrate(db *gorm.DB) {
 	db.AutoMigrate(&recipes.StepImageModel{})
 	db.AutoMigrate(&recipes.RecipeDependencyModel{})
 	db.AutoMigrate(&images.Image{})
+
+	db.AutoMigrate(&cookbooks.CookbookModel{})
+	db.AutoMigrate(&cookbooks.SectionModel{})
 }
 
 func main() {

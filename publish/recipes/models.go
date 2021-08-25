@@ -332,6 +332,16 @@ func GetRecipes(userID uint, pageNum string, pageSize string) ([]RecipeModel, er
 	return recipes, result.Error
 }
 
+func GetRecipesByIDs(userID uint, recipeIDs []uint) ([]RecipeModel, error) {
+	db := database.GetDB()
+	var recipes []RecipeModel
+	result := db.Where(map[string]interface{}{
+		"user_id": userID,
+	}).Find(&recipes, recipeIDs)
+
+	return recipes, result.Error
+}
+
 func FindRecipesByName(userID uint, searchString string, pageNum string, pageSize string) ([]RecipeModel, error) {
 
 	db := database.GetDB()

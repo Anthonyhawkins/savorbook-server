@@ -25,9 +25,35 @@ func (model *UserModel) Exists() bool {
 	return false
 }
 
+func (model *UserModel) EmailExists() bool {
+	db := database.GetDB()
+	var existingUsers []UserModel
+	db.Where("email = ?", model.Email).Find(&existingUsers)
+	if len(existingUsers) > 0 {
+		return true
+	}
+	return false
+}
+
+func (model *UserModel) UsernameExists() bool {
+	db := database.GetDB()
+	var existingUsers []UserModel
+	db.Where("username = ?", model.Username).Find(&existingUsers)
+	if len(existingUsers) > 0 {
+		return true
+	}
+	return false
+}
+
 func (model *UserModel) Create() {
 	db := database.GetDB()
 	db.Create(&model)
+}
+
+func (model *UserModel) Update() error {
+	db := database.GetDB()
+	result := db.Save(&model)
+	return result.Error
 }
 
 func (model *UserModel) Get() {
@@ -37,7 +63,6 @@ func (model *UserModel) Get() {
 }
 
 func FindOne(userID uint) (*UserModel, error) {
-	// Retrieve Existing User and ensure password matches
 	db := database.GetDB()
 	var user = new(UserModel)
 	result := db.First(&user, userID)

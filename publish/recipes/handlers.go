@@ -57,8 +57,15 @@ func RecipeGet(c *fiber.Ctx) error {
 
 	recipeID := c.Params("id")
 	userID := middleware.AuthedUserId(c.Locals("user"))
+	displayType := strings.ToLower(c.Query("type"))
 
-	model, err := GetRecipeFull(recipeID, userID)
+	var model RecipeModel
+	var err error
+	if displayType == "card" {
+		model, err = GetRecipe(recipeID, userID)
+	} else {
+		model, err = GetRecipeFull(recipeID, userID)
+	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		response.Message = "Recipe Not Found"
@@ -103,7 +110,6 @@ func RecipeList(c *fiber.Ctx) error {
 	userID := middleware.AuthedUserId(c.Locals("user"))
 	byName := strings.ToLower(c.Query("name"))
 	byTags := strings.ToLower(c.Query("tags"))
-
 	pageNum := strings.ToLower(c.Query("page"))
 	pageSize := strings.ToLower(c.Query("page_size"))
 
